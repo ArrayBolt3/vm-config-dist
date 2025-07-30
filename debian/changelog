@@ -1,3 +1,9 @@
+vm-config-dist (3:12.0-2) unstable; urgency=medium
+
+  * New upstream version (local package).
+
+ -- Aaron Rainbolt <arraybolt3@ubuntu.com>  Fri, 01 Aug 2025 15:28:34 -0500
+
 vm-config-dist (3:12.0-1) unstable; urgency=medium
 
   * New upstream version (local package).
