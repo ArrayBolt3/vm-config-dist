@@ -114,7 +114,7 @@ write_config_value() {
 
   ## Ensure the file always starts with the generated header comment.
   ## If the file exists and already has the header, keep it; otherwise add it.
-  if ! grep --quiet --fixed-strings "## This file was created by:" <<< "${config_file_contents}"; then
+  if ! grep --fixed-strings "## This file was created by:" <<< "${config_file_contents}" >/dev/null 2>&1; then
     config_file_contents="$(generated_file_header)"$'\n\n'"${config_file_contents}"
   fi
 
