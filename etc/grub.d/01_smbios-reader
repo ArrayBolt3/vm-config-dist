@@ -4,12 +4,11 @@
 ## See the file COPYING for copying conditions.
 
 ## This script is disabled by default and requires an explicit opt-in.
-## Otherwise an attacker who is able to write
-## information into SMBIOS can inject arbitrary kernel parameters into any
-## current or future installation on a victim system. Writing
-## info like this might be substantially easier than flashing a malicious
-## BIOS, so this is more of a concern than compromised firmware (though the
-## impact may be less bad than compromised firmware).
+## It allows kernel parameter injections via SMBIOS, which could be exploited
+## for malicious purposes.
+##
+## TODO: Once live-build is removed, we may be able to get rid of the
+## dm-smbios-reader border comments.
 
 set -o errexit
 set -o nounset
@@ -18,113 +17,33 @@ set -o errtrace
 shopt -s inherit_errexit
 shopt -s shift_verbose
 
-## Opt-in, default OFF. The reader is a boot-test facility, not a feature of a
-## shipped system, so a released image contains no reader at all -- there is no
-## code path for a firmware-level attacker to reach, which no in-image test on
-## firmware-supplied data could ever give (all of it is attacker-controllable by
-## definition). A build or a test harness turns it on by dropping a snippet into
-## /etc/default/grub.d, e.g.
-##
-##   printf '%s\n' 'GRUB_ENABLE_DM_SMBIOS_READER="true"' \
-##      > /etc/default/grub.d/50_dm-boot-test.cfg
-##   update-grub
-##
-## The drop-in needs no 'export' of its own: grub-mkconfig hands the /etc/grub.d
-## helpers only its fixed allow-list of GRUB_* variables, so this one reaches this
-## script via the export in etc/default/grub.d/99_smbios-cmdline.cfg, which sources
-## earlier in the same shell. That keeps the reader and the cmdline placeholder on
-## ONE signal rather than two that can disagree.
 [ -v GRUB_ENABLE_DM_SMBIOS_READER ] || GRUB_ENABLE_DM_SMBIOS_READER=""
 
 if [ "${GRUB_ENABLE_DM_SMBIOS_READER}" != "true" ]; then
    exit 0
 fi
 
-## Emit a GRUB SMBIOS cmdline reader near the top of the generated grub.cfg (the
-## '01_' prefix runs before the '10_' menuentry generators, so the variable is set
-## before any menuentry body executes). It lets a boot-tester inject extra kernel
-## cmdline through the real firmware -> GRUB -> kernel chain via 'qemu -smbios'
-## ('dm-qemu --smbios-append') with no image edit. The literal '${dm_smbios_extra}'
-## placeholder on each kernel line is added by /etc/default/grub.d/99_smbios-cmdline.cfg.
+## We only allow kernel parameter injection if SMBIOS reports that the
+## manufacturer is QEMU. When that is the case, we read the SMBIOS serial
+## number and see if it starts with "dm-cmdline='. If so, we take everything
+## after the '=' and store it in dm_smbios_extra, which will eventually be
+## interpolated into the kernel command line when this feature is enabled. We
+## also enable a serial console and make boot instant.
 ##
-## Because this is a grub-mkconfig helper, the reader is regenerated on every
-## 'update-grub' (e.g. on a kernel update), unlike a direct edit of the generated
-## /boot/grub/grub.cfg which 'update-grub' would wipe.
-##
-## Read the SMBIOS Type 1 system serial number (qemu -smbios
-## type=1,serial=dm-cmdline=...; offset 7 is a real string-reference field GRUB can
-## read -- Type 11 OEM strings have no such field, offset 5 is past the 5-byte
-## formatted area and faults) and, if it carries the 'dm-cmdline=' sentinel, expose
-## the rest as ${dm_smbios_extra}. The regexp and smbios modules are in Debian's
-## signed grub, so this works on BIOS and EFI; with no SMBIOS string set the reader
-## is a no-op and ${dm_smbios_extra} stays empty.
-##
-## The serial number is only read when SMBIOS Type 1 Manufacturer (offset 4) says
-## QEMU, which is what the boot-test harness runs under. Everywhere else the reader
-## is inert. This package is pulled in by dist-general-cli, so the reader ships on
-## bare-metal installs too, where the system serial number is a firmware field an
-## attacker with vendor DMI tooling can set -- and the kernel command line is the
-## part of the boot chain Secure Boot does not authenticate. Gating does not stop
-## that attacker (the same tool sets Manufacturer), but it forces the machine to
-## report itself as a QEMU guest to dmidecode, systemd-detect-virt and every
-## inventory system, instead of hiding in a field nobody reads.
-##
-## Manufacturer, not Product Name or the Type 0 BIOS vendor: qemu marks "QEMU" a
-## guest ABI constant (hw/i386/fw_cfg.c) and leaves it alone when only 'serial=' is
-## passed, so it holds across SeaBIOS and OVMF, i440fx and q35, amd64 and arm64.
-## Product Name carries the machine type and Type 0 vendor differs per firmware, so
-## either would break a boot-test leg on a machine type nobody thought about.
-## Reading Manufacturer FIRST also keeps a BARE-METAL boot quiet: DSP0134 requires
-## Manufacturer to be non-null but leaves the serial number optional, and GRUB
-## prints 'error: failed to retrieve the structure field.' for an absent string.
-## Under QEMU the gate passes, so that alone is not enough -- the serial-index
-## check inside the gate is what keeps an ordinary QEMU boot quiet.
-##
-## The heredoc is single-quoted so the shell writes ${dm_smbios_oem} literally for
-## GRUB to expand at boot.
-## When a boot-tester injected a cmdline via SMBIOS (dm_smbios_extra non-empty),
-## drive the serial console and boot the default entry immediately (timeout=0):
-## the tester drives the guest over the serial ROOT shell and cannot interact with
-## the GRUB menu, so a menu wait hangs the headless boot. A normal boot (no
-## injection) is unaffected -- dm_smbios_extra is empty and the block is skipped.
-##
-## 'terminal_output serial console' keeps 'console' deliberately.
-## serial-console-enable's etc/default/grub.d/30_serial_console.cfg argues against
-## pairing them, but that file sets GRUB_TERMINAL -- input AND output, on every
-## boot, on real hardware -- where duplicated output and a serial-input hijack of
-## the menu both matter. This sets OUTPUT only, on the injection-only test path,
-## and never takes serial input. Keeping 'console' leaves video output working if
-## serial init fails, and the EFI mirroring that file warns about would garble the
-## harness log LOUDLY rather than silently.
-##
-## terminal_INPUT is left alone on purpose. serial-console-enable ships
-## GRUB_TERMINAL="serial", which 00_header turns into 'terminal_input serial'
-## before this '01_' snippet runs, so GRUB reads the same line the harness writes
-## to. What makes that harmless is 'set timeout=0' below: with no menu countdown
-## there is nothing for stray serial input to interrupt. Restoring a menu wait
-## here without also pinning terminal_input would reintroduce the hang.
+## NOTE: Don't embed comments in the GRUB script code, those would end up in
+## grub.cfg.
+
 cat <<'EOF'
 ## dm-smbios-reader: begin
 insmod regexp
 insmod smbios
 insmod serial
-## Cleared first: 'smbios' and 'regexp' leave these untouched when they find no
-## match, and GRUB variables survive from grub.cfg's earlier 'load_env'. A value
-## left in grubenv would otherwise make an ordinary boot take the tester path.
 set dm_smbios_vendor=
 set dm_smbios_serial_index=0
 set dm_smbios_oem=
 set dm_smbios_extra=
-## Nothing below runs off QEMU: the serial number is only consulted once the
-## manufacturer identifies a QEMU guest.
 smbios --type 1 --get-string 4 --set dm_smbios_vendor
 if [ "${dm_smbios_vendor}" = "QEMU" ]; then
-    ## Offset 7 holds a string INDEX, and 0 means "no string" (DSP0134 6.1.3).
-    ## Asking for the string when the index is 0 makes GRUB print 'error: failed to
-    ## retrieve the structure field.' on the console -- which is EVERY ordinary boot
-    ## of an image built with the reader, because the serial is set only when a
-    ## tester injects. Reading the index byte first never errors, so the noisy call
-    ## happens only when there is something to read.
     smbios --type 1 --get-byte 7 --set dm_smbios_serial_index
     if [ "${dm_smbios_serial_index}" != "0" ]; then
         smbios --type 1 --get-string 7 --set dm_smbios_oem
