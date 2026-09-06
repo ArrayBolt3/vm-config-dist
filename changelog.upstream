@@ -1,3 +1,35 @@
+commit ce0811265504621d62a2ce05879f6113770c9671
+Merge: 072a09e 7a1003f
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sun Aug 30 10:29:22 2026 -0400
+
+    Merge remote-tracking branch 'refs/remotes/ArrayBolt3/arraybolt3/trixie'
+
+commit 7a1003f507c2633b0162502279eab547bada6d32
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Wed Aug 26 00:14:57 2026 -0400
+
+    Cleanup, rewrite latest kernel detection code
+
+commit 380fdf08ad376ccfe3ce324557dccf0fe72a1b26
+Merge: f986223 541e693
+Author: Aaron Rainbolt <arraybolt3@gmail.com>
+Date:   Tue Aug 25 22:53:56 2026 -0400
+
+    Merge branch 'ai' into arraybolt3/trixie
+
+commit 541e693356c5ffae0f53ee34d1c5e9a529629fbf
+Author: assisted-by-ai (Bot Account) (Machine Account) <228987186+assisted-by-ai@users.noreply.github.com>
+Date:   Mon Aug 24 23:30:24 2026 -0400
+
+    ci: drop orphaned consumer-secrets-audit.yml (reusable decommissioned)
+
+commit 072a09e7f0b210ae874cbca4933913982bae7a71
+Author: Patrick Schleizer <adrelanos@whonix.org>
+Date:   Sun Aug 23 05:51:10 2026 +0000
+
+    bumped changelog version
+
 commit 1f4d425836d24d4b47e2a54b07b554ba468ba880
 Author: Patrick Schleizer <adrelanos@whonix.org>
 Date:   Sun Aug 23 01:30:20 2026 -0400
