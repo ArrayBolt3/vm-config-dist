@@ -14,9 +14,6 @@
 ## wins) and only on 'software'; accelerated/unknown -> leave unset (err toward
 ## acceleration available).
 
-# shellcheck source=../../../helper-scripts/usr/libexec/helper-scripts/has.sh
-source "${HELPER_SCRIPTS_PATH:-}"/usr/libexec/helper-scripts/has.sh
-
 if ! has detect-software-rendering >/dev/null 2>/dev/null; then
   true "${0}: INFO: detect-software-rendering does not exist."
   return 0
