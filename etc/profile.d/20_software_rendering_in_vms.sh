@@ -14,21 +14,26 @@
 ## wins) and only on 'software'; accelerated/unknown -> leave unset (err toward
 ## acceleration available).
 
-if ! has detect-software-rendering >/dev/null 2>/dev/null; then
+## Can't use 'has', this has to be compatible with whatever login shell the
+## user has chosen.
+if ! command -v detect-software-rendering >/dev/null 2>&1; then
   true "${0}: INFO: detect-software-rendering does not exist."
   return 0
+  # shellcheck disable=SC2317
   exit 0
 fi
 
 if [ -z "${QMLSCENE_DEVICE}" ]; then
   true "${0}: INFO: QMLSCENE_DEVICE already set to: ${QMLSCENE_DEVICE}"
   return 0
+  # shellcheck disable=SC2317
   exit 0
 fi
 
 if [ ! "$(detect-software-rendering 2>/dev/null)" = "software" ]; then
   true "${0}: INFO: detect-software-rendering did not detect software rendering, ok, continuing..."
   return 0
+  # shellcheck disable=SC2317
   exit 0
 fi
 
