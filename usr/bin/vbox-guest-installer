@@ -61,6 +61,9 @@ find_latest_installed_kernel() {
   ## flavour as an architecture ('686-pae' is not the dpkg arch 'i386'). dpkg
   ## --compare-versions orders Debian ABI revisions (incl. +debN / +debN+M)
   ## correctly, which a plain version-sort does not.
+  ## Known limit: dpkg splits on the LAST hyphen, so several flavours of one
+  ## upstream at different ABIs (e.g. -cloud-amd64 vs +1-amd64) can mis-order; a
+  ## single-flavour build chroot is unaffected.
   for kernel_item in /boot/vmlinuz-*; do
     [ -f "${kernel_item}" ] || continue
     release="${kernel_item##*/vmlinuz-}"
