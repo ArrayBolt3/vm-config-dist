@@ -64,6 +64,11 @@ find_latest_installed_kernel() {
   for kernel_item in /boot/vmlinuz-*; do
     [ -f "${kernel_item}" ] || continue
     release="${kernel_item##*/vmlinuz-}"
+    ## A real kernel release starts with the version digit. Reject '.' / '..' (which
+    ## would make the /lib/modules test below pass spuriously, pointing at /lib or
+    ## /lib/modules itself) and any name dpkg --compare-versions cannot parse (a
+    ## leading '-', an embedded space).
+    [[ "${release}" == [0-9]* ]] || continue
     [ -d "/lib/modules/${release}" ] || continue
     if [ -z "${newest}" ] || dpkg --compare-versions "${release}" gt "${newest}"; then
       newest="${release}"
