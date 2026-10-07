@@ -51,19 +51,26 @@ virtualbox_guest_additions_packages_still_installed() {
 }
 
 find_latest_installed_kernel() {
-  local kernel_list kernel_item kernel_release_list
+  local kernel_item release newest=""
 
-  readarray -t kernel_list < <(find /boot -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | grep '^vmlinuz-')
-  kernel_release_list=()
-
-  for kernel_item in "${kernel_list[@]}"; do
-    ## Keep the full release (the uname -r / /lib/modules/<release> name) that
-    ## vboxadd needs as TARGET_VER -- do NOT strip the flavour, and do not
-    ## arch-filter on it (a flavour like '686-pae' is not the dpkg arch 'i386').
-    kernel_release_list+=( "${kernel_item#vmlinuz-}" )
+  ## TARGET_VER must be a full kernel release (the uname -r / /lib/modules/<release>
+  ## name) that vboxadd builds against (/lib/modules/"${TARGET_VER}"/build), flavour
+  ## included. Consider only a /boot/vmlinuz-<release> whose module tree is actually
+  ## installed: this skips backup names (vmlinuz-*.dpkg-bak / .old) and any image
+  ## with no buildable modules (e.g. a foreign architecture), without parsing the
+  ## flavour as an architecture ('686-pae' is not the dpkg arch 'i386'). dpkg
+  ## --compare-versions orders Debian ABI revisions (incl. +debN / +debN+M)
+  ## correctly, which a plain version-sort does not.
+  for kernel_item in /boot/vmlinuz-*; do
+    [ -f "${kernel_item}" ] || continue
+    release="${kernel_item##*/vmlinuz-}"
+    [ -d "/lib/modules/${release}" ] || continue
+    if [ -z "${newest}" ] || dpkg --compare-versions "${release}" gt "${newest}"; then
+      newest="${release}"
+    fi
   done
 
-  printf '%s\n' "${kernel_release_list[@]}" | sort --reverse --version-sort | head -n1
+  printf '%s\n' "${newest}"
 }
 
 error_handler() {
