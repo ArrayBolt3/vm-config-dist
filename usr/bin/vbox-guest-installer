@@ -51,34 +51,20 @@ virtualbox_guest_additions_packages_still_installed() {
 }
 
 find_latest_installed_kernel() {
-  local kernel_item release newest=""
+  local kernel_item current_kver newest_kver=""
 
-  ## TARGET_VER must be a full kernel release (the uname -r / /lib/modules/<release>
-  ## name) that vboxadd builds against (/lib/modules/"${TARGET_VER}"/build), flavour
-  ## included. Consider only a /boot/vmlinuz-<release> whose module tree is actually
-  ## installed: this skips backup names (vmlinuz-*.dpkg-bak / .old) and any image
-  ## with no buildable modules (e.g. a foreign architecture), without parsing the
-  ## flavour as an architecture ('686-pae' is not the dpkg arch 'i386'). dpkg
-  ## --compare-versions orders Debian ABI revisions (incl. +debN / +debN+M)
-  ## correctly, which a plain version-sort does not.
-  ## Known limit: dpkg splits on the LAST hyphen, so several flavours of one
-  ## upstream at different ABIs (e.g. -cloud-amd64 vs +1-amd64) can mis-order; a
-  ## single-flavour build chroot is unaffected.
   for kernel_item in /boot/vmlinuz-*; do
     [ -f "${kernel_item}" ] || continue
-    release="${kernel_item##*/vmlinuz-}"
-    ## A real kernel release starts with the version digit. Reject '.' / '..' (which
-    ## would make the /lib/modules test below pass spuriously, pointing at /lib or
-    ## /lib/modules itself) and any name dpkg --compare-versions cannot parse (a
-    ## leading '-', an embedded space).
-    [[ "${release}" == [0-9]* ]] || continue
-    [ -d "/lib/modules/${release}" ] || continue
-    if [ -z "${newest}" ] || dpkg --compare-versions "${release}" gt "${newest}"; then
-      newest="${release}"
+    current_kver="${kernel_item##*/vmlinuz-}"
+    [[ "${current_kver}" == [0-9]* ]] || continue
+    ## Need kernel modules for a particular kernel to be useful.
+    [ -d "/usr/lib/modules/${current_kver}" ] || continue
+    if [ -z "${newest_kver}" ] || dpkg --compare-versions "${current_kver}" gt "${newest_kver}"; then
+      newest_kver="${current_kver}"
     fi
   done
 
-  printf '%s\n' "${newest}"
+  printf '%s\n' "${newest_kver}"
 }
 
 error_handler() {
